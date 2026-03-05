@@ -144,13 +144,13 @@ else
   agent_exec='exec codex --dangerously-bypass-approvals-and-sandbox "$prompt"'
 fi
 
-cat >"$runner_script" <<RUNNER
-#!/usr/bin/env bash
-set -euo pipefail
-prompt_file="$prompt_bundle"
-prompt="$(cat \"$prompt_bundle\")"
-$agent_exec
-RUNNER
+{
+  echo '#!/usr/bin/env bash'
+  echo 'set -euo pipefail'
+  echo "prompt_file=\"$prompt_bundle\""
+  echo 'prompt="$(cat "$prompt_file")"'
+  printf '%s\n' "$agent_exec"
+} >"$runner_script"
 
 chmod +x "$runner_script"
 
