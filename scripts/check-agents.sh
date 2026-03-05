@@ -42,13 +42,13 @@ start_task_session() {
       agent_exec='exec codex --dangerously-bypass-approvals-and-sandbox "$prompt"'
     fi
 
-    cat >"$runner_script" <<RUNNER
-#!/usr/bin/env bash
-set -euo pipefail
-prompt_file="$prompt_bundle"
-prompt="\$(cat \"\$prompt_file\")"
-$agent_exec
-RUNNER
+    {
+      echo '#!/usr/bin/env bash'
+      echo 'set -euo pipefail'
+      echo "prompt_file=\"$prompt_bundle\""
+      echo 'prompt="$(cat "$prompt_file")"'
+      printf '%s\n' "$agent_exec"
+    } >"$runner_script"
     chmod +x "$runner_script"
   fi
 
@@ -75,15 +75,59 @@ get_pr_json() {
   return 1
 }
 
+actions_latest_ci_status() {
+  local repo="$1"
+  local branch="$2"
+
+  if [[ $GH_AVAILABLE -ne 1 ]]; then
+    printf 'unknown\n'
+    return 0
+  fi
+
+  # Use Actions runs as a fallback signal when PR statusCheckRollup is empty or delayed.
+  # Returns: success | failure | pending | unknown
+  local out status conclusion
+  if ! out="$(gh run list --repo "$repo" --branch "$branch" --limit 1 --json status,conclusion 2>/dev/null)"; then
+    printf 'unknown\n'
+    return 0
+  fi
+
+  if [[ -z "$out" || "$(jq 'length' <<<"$out" 2>/dev/null || echo 0)" -eq 0 ]]; then
+    printf 'unknown\n'
+    return 0
+  fi
+
+  status="$(jq -r '.[0].status // ""' <<<"$out")"
+  conclusion="$(jq -r '.[0].conclusion // ""' <<<"$out")"
+
+  if [[ "$status" != "completed" ]]; then
+    printf 'pending\n'
+    return 0
+  fi
+
+  if [[ "$conclusion" == "success" ]]; then
+    printf 'success\n'
+  elif [[ -n "$conclusion" ]]; then
+    printf 'failure\n'
+  else
+    printf 'unknown\n'
+  fi
+}
+
 ci_checks_passed() {
   local pr_json="$1"
-  jq -r '
+  local repo="$2"
+  local branch="$3"
+
+  # 1) Prefer GitHub's PR rollup when available.
+  local rollup_decision
+  rollup_decision="$(jq -r '
     def failed(c): ["FAILURE","CANCELLED","TIMED_OUT","ACTION_REQUIRED","STARTUP_FAILURE"] | index(c) != null;
     def pending(s): ["EXPECTED","PENDING","QUEUED","IN_PROGRESS","WAITING","REQUESTED"] | index(s) != null;
 
     (.statusCheckRollup // []) as $checks
     | if ($checks | length) == 0 then
-        "false"
+        "unknown"
       elif any($checks[]?; failed(.conclusion // "")) then
         "false"
       elif any($checks[]?; pending(.status // "")) then
@@ -93,7 +137,20 @@ ci_checks_passed() {
       else
         "true"
       end
-  ' <<<"$pr_json"
+  ' <<<"$pr_json")"
+
+  if [[ "$rollup_decision" == "true" || "$rollup_decision" == "false" ]]; then
+    printf '%s\n' "$rollup_decision"
+    return 0
+  fi
+
+  # 2) Fallback: use latest Actions run for the branch (handles empty/delayed rollups).
+  case "$(actions_latest_ci_status "$repo" "$branch")" in
+    success) printf 'true\n' ;;
+    pending) printf 'false\n' ;;
+    failure) printf 'false\n' ;;
+    *) printf 'false\n' ;;
+  esac
 }
 
 spawn_auto_review() {
@@ -254,7 +311,7 @@ for task_json in "${tasks[@]}"; do
       pr_state="$(jq -r '.state // "UNKNOWN"' <<<"$pr_json")"
       update_task "$task_id" "$(jq -n --argjson pr "$pr_number" --arg state "$pr_state" '{prNumber:$pr, prState:$state}')"
 
-      ci_passed="$(ci_checks_passed "$pr_json")"
+      ci_passed="$(ci_checks_passed "$pr_json" "$repo" "$branch")"
       if [[ "$ci_passed" == "true" ]]; then
         if [[ "$review_status" == "none" || "$review_status" == "failed" ]]; then
           spawn_auto_review "$task_json" "$pr_number" || true
