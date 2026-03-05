@@ -148,7 +148,7 @@ cat >"$runner_script" <<RUNNER
 #!/usr/bin/env bash
 set -euo pipefail
 prompt_file="$prompt_bundle"
-prompt="\$(cat \"\$prompt_file\")"
+prompt="$(cat \"$prompt_bundle\")"
 $agent_exec
 RUNNER
 
