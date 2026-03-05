@@ -1,0 +1,16 @@
+[
+  {
+    "id": "task-user-auth",
+    "tmuxSession": "swarm-task-user-auth",
+    "agent": "claude",
+    "description": "Implement password reset and validation flow",
+    "repo": "/home/user/dev/my-repo",
+    "worktree": "/tmp/swarm-worktrees/task-user-auth",
+    "branch": "swarm/task-user-auth-20260305090000",
+    "startedAt": 1762314000000,
+    "status": "running",
+    "retryCount": 0,
+    "notifyOnComplete": true,
+    "reviewStatus": "none"
+  }
+]

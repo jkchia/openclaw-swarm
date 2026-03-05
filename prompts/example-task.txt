@@ -1,0 +1,21 @@
+# Task Request Template
+
+Implement feature: <feature-name>
+
+## Goal
+Describe what should exist after this task is complete.
+
+## Constraints
+- Keep backward compatibility where possible.
+- Add or update tests for changed behavior.
+- Keep scope focused to this task.
+
+## Definition of Done
+- Code compiles and tests pass.
+- PR includes implementation summary and tradeoffs.
+- Any risky edge cases are documented in PR notes.
+
+## Deliverables
+- Source code changes
+- Tests
+- PR with checklist

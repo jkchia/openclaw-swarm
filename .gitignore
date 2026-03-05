@@ -1,0 +1,5 @@
+.env
+.active-tasks.lock
+*.log
+*.tmp
+.DS_Store
